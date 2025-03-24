@@ -1,0 +1,57 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f7f7f7;
+    font-family: Arial, sans-serif;
+}
+
+.game-container {
+    position: relative;
+    width: 600px;
+    height: 200px;
+    border: 2px solid black;
+    background-color: white;
+    overflow: hidden;
+}
+
+#dino {
+    position: absolute;
+    bottom: 0;
+    left: 50px;
+    width: 50px;
+    height: 50px;
+}
+
+#cactus {
+    position: absolute;
+    bottom: 0;
+    right: -50px;
+    width: 30px;
+    height: 50px;
+}
+
+button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: block;
+}
+
+button:active {
+    background-color: #218838;
+}

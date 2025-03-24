@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tensei Runner | Koustubh Gaikwad</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --text: #f5f5f5;
+            --primary: #7f5af0;
+            --secondary: #2cb67d;
+            --accent: #d946ef;
+            --neon-pink: #ff2a6d;
+            --neon-blue: #05d9e8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            background-color: #111;
+            max-width: 100%;
+            max-height: 100vh;
+        }
+
+        .game-ui {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text);
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+        }
+
+        #score {
+            color: var(--neon-blue);
+        }
+
+        #coins {
+            color: gold;
+            margin-left: 20px;
+        }
+
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 2rem;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+            display: none;
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 20px var(--primary);
+        }
+
+        .game-over h2 {
+            color: var(--neon-pink);
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+
+        .game-over p {
+            margin-bottom: 1.5rem;
+            font-size: 1.2rem;
+        }
+
+        .restart-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 30px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .restart-btn:hover {
+            background: var(--accent);
+            transform: scale(1.05);
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            transition: all 0.2s;
+        }
+
+        .control-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                gap: 15px;
+            }
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-ui">
+        Score: <span id="score">0</span>
+        Coins: <span id="coins">0</span>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="game-over">
+        <h2>Game Over!</h2>
+        <p>Score: <span id="final-score">0</span></p>
+        <p>Coins: <span id="final-coins">0</span></p>
+        <button class="restart-btn">Play Again</button>
+    </div>
+
+    <div class="controls">
+        <button class="control-btn" id="left-btn">←</button>
+        <button class="control-btn" id="jump-btn">↑</button>
+        <button class="control-btn" id="slide-btn">↓</button>
+        <button class="control-btn" id="right-btn">→</button>
+    </div>
+
+    <script>
+        // Game Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Game Variables
+        let score = 0;
+        let coins = 0;
+        let gameSpeed = 5;
+        let gameRunning = true;
+        let keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false,
+            ArrowDown: false
+        };
+
+        // Player
+        const player = {
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 150,
+            width: 50,
+            height: 80,
+            speed: 5,
+            lane: 1, // 0: left, 1: middle, 2: right
+            isJumping: false,
+            isSliding: false,
+            jumpHeight: 150,
+            slideDuration: 1000,
+            gravity: 0.5,
+            velocity: 0,
+            draw() {
+                ctx.fillStyle = '#7f5af0';
+                if (this.isSliding) {
+                    ctx.fillRect(this.x, this.y + 40, this.width, this.height - 40);
+                } else {
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            },
+            update() {
+                // Lane movement
+                if (keys.ArrowLeft && this.lane > 0 && !this.isJumping && !this.isSliding) {
+                    this.lane--;
+                }
+                if (keys.ArrowRight && this.lane < 2 && !this.isJumping && !this.isSliding) {
+                    this.lane++;
+                }
+
+                // Jumping
+                if (keys.ArrowUp && !this.isJumping && !this.isSliding) {
+                    this.isJumping = true;
+                    this.velocity = -15;
+                }
+
+                // Sliding
+                if (keys.ArrowDown && !this.isJumping && !this.isSliding) {
+                    this.isSliding = true;
+                    setTimeout(() => {
+                        this.isSliding = false;
+                    }, this.slideDuration);
+                }
+
+                // Apply gravity if jumping
+                if (this.isJumping) {
+                    this.y += this.velocity;
+                    this.velocity += this.gravity;
+
+                    // Check if landed
+                    if (this.y >= canvas.height - 150) {
+                        this.y = canvas.height - 150;
+                        this.isJumping = false;
+                        this.velocity = 0;
+                    }
+                }
+
+                // Update X position based on lane
+                const targetX = [canvas.width / 4 - 25, canvas.width / 2 - 25, (3 * canvas.width) / 4 - 25][this.lane];
+                this.x += (targetX - this.x) * 0.2;
+            }
+        };
+
+        // Obstacles
+        const obstacles = [];
+        const lanes = [canvas.width / 4, canvas.width / 2, (3 * canvas.width) / 4];
+
+        function createObstacle() {
+            const lane = Math.floor(Math.random() * 3);
+            const types = ['box', 'barrier', 'coin'];
+            const type = types[Math.floor(Math.random() * 3)];
+
+            obstacles.push({
+                x: lanes[lane] - 25,
+                y: -100,
+                width: 50,
+                height: type === 'coin' ? 30 : 70,
+                lane,
+                type,
+                speed: gameSpeed,
+                passed: false
+            });
+        }
+
+        // Game Loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw road (3 lanes)
+            ctx.fillStyle = '#222';
+            for (let i = 0; i < 3; i++) {
+                ctx.fillRect(i * (canvas.width / 3), 0, canvas.width / 3, canvas.height);
+            }
+
+            // Draw lane markers
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 5;
+            for (let i = 1; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * (canvas.width / 3), 0);
+                ctx.lineTo(i * (canvas.width / 3), canvas.height);
+                ctx.stroke();
+            }
+
+            // Update and draw player
+            player.update();
+            player.draw();
+
+            // Update and draw obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+
+                // Move obstacle
+                obs.y += obs.speed;
+
+                // Draw obstacle
+                if (obs.type === 'coin') {
+                    ctx.fillStyle = 'gold';
+                    ctx.beginPath();
+                    ctx.arc(obs.x + 25, obs.y + 15, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = obs.type === 'box' ? '#d946ef' : '#ff2a6d';
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                }
+
+                // Collision detection
+                if (
+                    player.x < obs.x + obs.width &&
+                    player.x + player.width > obs.x &&
+                    player.y < obs.y + obs.height &&
+                    player.y + player.height > obs.y &&
+                    !player.isJumping &&
+                    !player.isSliding
+                ) {
+                    if (obs.type === 'coin') {
+                        coins++;
+                        document.getElementById('coins').textContent = coins;
+                        obstacles.splice(i, 1);
+                        continue;
+                    } else {
+                        gameOver();
+                    }
+                }
+
+                // Increase score when passing obstacles
+                if (!obs.passed && obs.y > player.y + player.height) {
+                    obs.passed = true;
+                    score += 10;
+                    document.getElementById('score').textContent = score;
+                }
+
+                // Remove off-screen obstacles
+                if (obs.y > canvas.height) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Spawn new obstacles randomly
+            if (Math.random() < 0.02) {
+                createObstacle();
+            }
+
+            // Increase game speed over time
+            gameSpeed += 0.001;
+
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Game Over
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-coins').textContent = coins;
+            document.querySelector('.game-over').style.display = 'block';
+        }
+
+        // Restart Game
+        function restartGame() {
+            score = 0;
+            coins = 0;
+            gameSpeed = 5;
+            obstacles.length = 0;
+            player.lane = 1;
+            player.isJumping = false;
+            player.isSliding = false;
+            player.y = canvas.height - 150;
+            document.getElementById('score').textContent = '0';
+            document.getElementById('coins').textContent = '0';
+            document.querySelector('.game-over').style.display = 'none';
+            gameRunning = true;
+            gameLoop();
+        }
+
+        // Event Listeners
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                keys[e.key] = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                keys[e.key] = false;
+            }
+        });
+
+        // Touch controls for mobile
+        document.getElementById('left-btn').addEventListener('touchstart', () => keys.ArrowLeft = true);
+        document.getElementById('left-btn').addEventListener('touchend', () => keys.ArrowLeft = false);
+        document.getElementById('right-btn').addEventListener('touchstart', () => keys.ArrowRight = true);
+        document.getElementById('right-btn').addEventListener('touchend', () => keys.ArrowRight = false);
+        document.getElementById('jump-btn').addEventListener('touchstart', () => keys.ArrowUp = true);
+        document.getElementById('jump-btn').addEventListener('touchend', () => keys.ArrowUp = false);
+        document.getElementById('slide-btn').addEventListener('touchstart', () => keys.ArrowDown = true);
+        document.getElementById('slide-btn').addEventListener('touchend', () => keys.ArrowDown = false);
+
+        // Button controls for desktop
+        document.getElementById('left-btn').addEventListener('mousedown', () => keys.ArrowLeft = true);
+        document.getElementById('left-btn').addEventListener('mouseup', () => keys.ArrowLeft = false);
+        document.getElementById('right-btn').addEventListener('mousedown', () => keys.ArrowRight = true);
+        document.getElementById('right-btn').addEventListener('mouseup', () => keys.ArrowRight = false);
+        document.getElementById('jump-btn').addEventListener('mousedown', () => keys.ArrowUp = true);
+        document.getElementById('jump-btn').addEventListener('mouseup', () => keys.ArrowUp = false);
+        document.getElementById('slide-btn').addEventListener('mousedown', () => keys.ArrowDown = true);
+        document.getElementById('slide-btn').addEventListener('mouseup', () => keys.ArrowDown = false);
+
+        document.querySelector('.restart-btn').addEventListener('click', restartGame);
+
+        // Start the game
+        gameLoop();
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.y = canvas.height - 150;
+        });
+    </script>
+</body>
+    </html>
